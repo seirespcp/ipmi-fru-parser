@@ -574,8 +574,8 @@ int validateFRUArea(const uint8_t fruid, const char* fruFilename,
     // are not used, keeping it here for completeness.
     FruAreaVector fruAreaVec;
 
-    for (uint8_t fruEntry = IPMI_FRU_INTERNAL_OFFSET;
-         fruEntry < (sizeof(struct common_header) - 2); fruEntry++)
+    for (uint8_t fruEntry = IPMI_FRU_CHASSIS_OFFSET;
+         fruEntry < IPMI_FRU_MULTI_OFFSET; fruEntry++)
     {
         // Create an object and push onto a vector.
         std::unique_ptr<IPMIFruArea> fruArea = std::make_unique<IPMIFruArea>(
