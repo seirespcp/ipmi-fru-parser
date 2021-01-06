@@ -46,7 +46,7 @@ ipmi_ret_t ipmiStorageWriteFruData(ipmi_netfn_t netfn, ipmi_cmd_t cmd,
 
     // On error there is no response data for this command.
     *dataLen = 0;
-
+std::printf("%s %d FILE=%s OFFSET=%d LENGTH=%02X\n",__func__,__LINE__,fruFilename,offset,len);
 #ifdef __IPMI__DEBUG__
     log<level::DEBUG>("IPMI WRITE-FRU-DATA", entry("FILE=%s", fruFilename),
                       entry("OFFSET=%d", offset), entry("LENGTH=%d", len));

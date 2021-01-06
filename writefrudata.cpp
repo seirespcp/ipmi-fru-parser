@@ -379,15 +379,16 @@ int verifyFruData(const uint8_t* data, const size_t len, bool validateCrc)
     {
         log<level::ERR>("Invalid entry in byte-0",
                         entry("ENTRY=0x%X", static_cast<uint32_t>(data[0])));
+std::printf("%s %d Invalid entry=0x%X\n",__func__,__LINE__,static_cast<uint32_t>(data[0]));
         return rc;
     }
-#ifdef __IPMI_DEBUG__
+//#ifdef __IPMI_DEBUG__
     else
     {
         log<level::DEBUG>("Validated in entry_1 of fruData",
                           entry("ENTRY=0x%X", static_cast<uint32_t>(data[0])));
     }
-#endif
+//#endif
 
     if (!validateCrc)
     {
@@ -398,6 +399,7 @@ int verifyFruData(const uint8_t* data, const size_t len, bool validateCrc)
     // See if the calculated CRC matches with the embedded one.
     // CRC to be calculated on all except the last one that is CRC itself.
     checksum = calculateCRC(data, len - 1);
+std::printf("%s %d Calculated=0x%X Embedded=0x%X\n",__func__,__LINE__,static_cast<uint32_t>(checksum),static_cast<uint32_t>(data[len-1]));
     if (checksum != data[len - 1])
     {
 #ifdef __IPMI_DEBUG__
@@ -414,7 +416,7 @@ int verifyFruData(const uint8_t* data, const size_t len, bool validateCrc)
         log<level::DEBUG>("Checksum matches");
     }
 #endif
-
+std::printf("%s %d everything went fine\n",__func__,__LINE__);
     return EXIT_SUCCESS;
 }
 
@@ -449,6 +451,7 @@ int ipmiPopulateFruAreas(uint8_t* fruData, const size_t dataLen,
     // offset mentioned by the struct common_header. If the file size is less
     // than the offset of any if the FRU areas mentioned in the common header,
     // then we do not have a complete file.
+std::printf("%s %d\n",__func__,__LINE__);
     for (uint8_t fruEntry = IPMI_FRU_INTERNAL_OFFSET;
          fruEntry < (sizeof(struct common_header) - 2); fruEntry++)
     {
@@ -478,14 +481,18 @@ int ipmiPopulateFruAreas(uint8_t* fruData, const size_t dataLen,
             log<level::DEBUG>("FRU Data", entry("SIZE=%d", dataLen),
                               entry("AREA OFFSET=%d", areaOffset),
                               entry("AREA_SIZE=%d", areaLen));
-
+std::printf("%s %d fruEntry=%d SIZE=%d areaOffset=0x%02X areaLen=0x%02X\n",__func__,__LINE__,fruEntry,dataLen,areaOffset,areaLen);
             // See if we really have that much buffer. We have area offset amd
             // from there, the actual len.
             if (dataLen < (areaLen + areaOffset))
             {
-                log<level::ERR>("Incomplete FRU file",
+// second byte of internal user area is not the length, you should parse the entire thing
+// to determine its length, so don't return error just yet
+                if(fruEntry != IPMI_FRU_INTERNAL_OFFSET){
+                    log<level::ERR>("Incomplete FRU file",
                                 entry("SIZE=%d", dataLen));
-                return rc;
+                    return rc;
+                }
             }
 
             // Save off the data.
@@ -495,7 +502,10 @@ int ipmiPopulateFruAreas(uint8_t* fruData, const size_t dataLen,
             // contents beyond the first byte are not defined in the spec and
             // it may not end with a CRC byte.
             bool validateCrc = fruEntry != IPMI_FRU_INTERNAL_OFFSET;
-            rc = verifyFruData(areaData, areaLen, validateCrc);
+            if(fruEntry == IPMI_FRU_MULTI_OFFSET)
+                rc = 0;
+            else
+                rc = verifyFruData(areaData, areaLen, validateCrc);
             if (rc < 0)
             {
                 log<level::ERR>("Err validating FRU area",
@@ -517,7 +527,9 @@ int ipmiPopulateFruAreas(uint8_t* fruData, const size_t dataLen,
                     iter->setData(areaData, areaLen);
                 }
             }
-        } // If we have FRU data present
+        }else{
+            std::printf("%s %d fruEntry=%d does not exist\n",__func__,__LINE__,fruEntry);
+        }// If we have FRU data present
     }     // Walk struct common_header
 
     // Not all the fields will be populated in a FRU data. Mostly all cases will
@@ -559,7 +571,7 @@ int ipmiValidateCommonHeader(const uint8_t* fruData, const size_t dataLen)
         log<level::ERR>("Failed to validate common header");
         return rc;
     }
-
+std::printf("%s %d everything went fine\n",__func__,__LINE__);
     return EXIT_SUCCESS;
 }
 
@@ -574,7 +586,7 @@ int validateFRUArea(const uint8_t fruid, const char* fruFilename,
     // are not used, keeping it here for completeness.
     FruAreaVector fruAreaVec;
 
-    for (uint8_t fruEntry = IPMI_FRU_CHASSIS_OFFSET;
+    for (uint8_t fruEntry = IPMI_FRU_INTERNAL_OFFSET;
          fruEntry < IPMI_FRU_MULTI_OFFSET; fruEntry++)
     {
         // Create an object and push onto a vector.
@@ -584,7 +596,7 @@ int validateFRUArea(const uint8_t fruid, const char* fruFilename,
         // Physically being present
         bool present = access(fruFilename, F_OK) == 0;
         fruArea->setPresent(present);
-
+std::printf("%s %d fruid=0x%02X fruEntry=0x%02X present=%d\n",__func__,__LINE__,fruid,fruEntry,present);
         fruAreaVec.emplace_back(std::move(fruArea));
     }
 
@@ -623,7 +635,7 @@ int validateFRUArea(const uint8_t fruid, const char* fruFilename,
     // We are done reading.
     std::fclose(fruFilePointer);
     fruFilePointer = NULL;
-
+std::printf("%s %d fruid=0x%02X fruFilename=%s dataLen=%d\n",__func__,__LINE__,fruid,fruFilename,dataLen);
     rc = ipmiValidateCommonHeader(fruData, dataLen);
     if (rc < 0)
     {
@@ -643,7 +655,7 @@ int validateFRUArea(const uint8_t fruid, const char* fruFilename,
         log<level::DEBUG>("Populated FRU areas", entry("FILE=%s", fruFilename));
     }
 
-#ifdef __IPMI_DEBUG__
+//#ifdef __IPMI_DEBUG__
     for (const auto& iter : fruAreaVec)
     {
         std::printf("FRU ID : [%d]\n", iter->getFruID());
@@ -651,7 +663,7 @@ int validateFRUArea(const uint8_t fruid, const char* fruFilename,
         std::printf("TYPE : [%d]\n", iter->getType());
         std::printf("LEN : [%d]\n", iter->getLength());
     }
-#endif
+//#endif
 
     // If the vector is populated with everything, then go ahead and update the
     // inventory.
